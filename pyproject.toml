@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "chatbot_api"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [
+    { include = "app" },
+]
+
+[tool.poetry.dependencies]
+python = ">3.9.0,<3.13"
+uvicorn = "^0.23.2"
+langserve = {extras = ["server"], version = ">=0.0.30"}
+pydantic = ">=2.7.4,<3.0.0"
+python-dotenv = "^1.0.1"
+langchain = "^0.2.14"
+langchain-groq = "^0.1.9"
+langchain-community = "^0.2.12"
+langchain-chroma = "^0.1.2"
+fastembed = "^0.3.4"
+pypdf = "^4.3.1"
+python-multipart = "^0.0.9"
+pdfminer-six = "^20191110"
+pgvector = ">=0.2.5,<0.3.0"
+psycopg2 = "^2.9.9"
+upstash-redis = "^1.1.0"
+langchain-postgres = "^0.0.9"
+jwt = "^1.3.1"
+pyjwt = "^2.9.0"
+passlib = "1.7.4"
+bcrypt = ">=4.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+langchain-cli = ">=0.0.15"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
