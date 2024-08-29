@@ -7,11 +7,12 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader
 from app.chatbot.vector_store.db import CONNECTION_STRING
 from langchain_community.vectorstores import PGVector
 from langchain_community.embeddings import FastEmbedEmbeddings
+from fastapi import HTTPException
 
 load_dotenv()
 
 def upload_to_vectorstore(filename: str):
-    # try:
+    try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         file_dir = os.path.join(current_dir,"docs_resources", filename)
         
@@ -29,7 +30,7 @@ def upload_to_vectorstore(filename: str):
         elif filename.endswith(".pdf"):
             loader = PyPDFLoader(file_dir)
         else:
-            raise Exception("Wrong file format")
+            raise HTTPException(status_code=400, detail="Wrong file format.")
         
         documents = loader.load()
                     
@@ -48,8 +49,8 @@ def upload_to_vectorstore(filename: str):
             use_jsonb=True
         )
         return filename
-    # except Exception as e:
-    #     raise {"exception": e}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=e)
 
 
     

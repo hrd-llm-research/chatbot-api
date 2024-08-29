@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
+from app.utils import get_db
 
 models.Base.metadata.create_all(bind=engine)
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -14,14 +15,6 @@ router = APIRouter(
     tags={"users"}
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        
-# @router.post("/users", response_model=schemas.User)
 @router.post("/register")
 async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # db_user = crud.get_user_by_email(db, email=user.email)
@@ -34,7 +27,6 @@ async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             "message": "You are registered successfully.",
             "payload": user.to_dict(),
             "success": True,
-            # "created_at": datetime.now()
         }
     )
 
@@ -56,7 +48,6 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()] , db:
         status_code=status.HTTP_200_OK,
         content={
             "message": "Login successfully.",
-            # "created_at" : datetime.now(),
             "success": True,
             "payload": user.to_dict(),
             "access_token" : schemas.Token(access_token=access_token,token_type= "bearer").to_dict(),

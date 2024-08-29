@@ -139,7 +139,7 @@ def chatbot_with_postgres(question: str):
     try:
         table_name = "message_history"
         
-        session_id = str(uuid.uuid4())
+        session_id = "9016aef4-5a67-4c2f-b829-f90e1aff4227"
 
         # Initialize the chat history manager
         chat_history_db = PostgresChatMessageHistory(
@@ -150,7 +150,6 @@ def chatbot_with_postgres(question: str):
         
         # Get the chat history from postgres database
         chat_history = chat_history_db.get_messages()
-        chat_history = []
         
         retriever = retriveal_documents()
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
