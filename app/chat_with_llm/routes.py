@@ -7,6 +7,7 @@ router = APIRouter()
 
 llm = Ollama(
     model="llama3",
+    
 )
 
 prompt = ChatPromptTemplate.from_template(
