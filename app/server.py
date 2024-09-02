@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
@@ -16,11 +20,11 @@ app.include_router(auth_routes, prefix="/api/v1")
 app.include_router(chatbot_routes)
 app.include_router(file_upload_routes)
 
-add_routes(
-    app,
-    prompt | llm,
-    path="/chat_with_llm"
-)
+# add_routes(
+#     app,
+#     prompt | llm,
+#     path="/chat_with_ollama"
+# )
 
 if __name__ == "__main__":
     import uvicorn

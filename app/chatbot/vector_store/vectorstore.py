@@ -48,7 +48,7 @@ def upload_to_vectorstore(filename: str):
             pre_delete_collection = False  ,
             use_jsonb=True
         )
-        return filename
+        return COLLECTION_NAME
     except Exception as e:
         raise HTTPException(status_code=400, detail=e)
 

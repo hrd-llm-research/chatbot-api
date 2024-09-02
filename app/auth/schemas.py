@@ -22,12 +22,12 @@ class UserResponse(BaseModel):
     # This tells Pydantic to read the data as if it were an ORM model, 
     # allowing you to use SQLAlchemy models directly.
     class Config:
-        orm_mode = True
-        # from_attributes = True
+        # orm_mode = True
+        from_attributes = True
         
     
 class TokenData(BaseModel):
-    username: str | None = None
+    email: str | None = None
     
 class UserCreate(User):
     password: str

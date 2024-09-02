@@ -2,7 +2,6 @@ import os
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
@@ -14,6 +13,9 @@ from langchain_community.vectorstores import PGVector
 from langchain_postgres import PostgresChatMessageHistory
 import uuid
 from app.chatbot.vector_store.db import sync_connection
+from . import crud, schemas
+from sqlalchemy.orm import Session
+from app.message_history import dependencies
 
 load_dotenv()
 
@@ -130,12 +132,12 @@ def chatbot(question: str):
         history.add_message(HumanMessage(content=question))
         history.add_message(SystemMessage(content=result['answer']))
         
-        return result
+        return result['answer']
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
 
 
-def chatbot_with_postgres(question: str):
+def chatbot_with_all_collection(question: str):
     try:
         table_name = "message_history"
         
@@ -150,6 +152,7 @@ def chatbot_with_postgres(question: str):
         
         # Get the chat history from postgres database
         chat_history = chat_history_db.get_messages()
+
         
         retriever = retriveal_documents()
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
@@ -157,33 +160,59 @@ def chatbot_with_postgres(question: str):
         chat_history_db.add_message(HumanMessage(content=question))
         chat_history_db.add_message(SystemMessage(content=result['answer']))
         
-        return result
+        return result['answer']
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
     
 
-def chat_with_collection(collection_name: str, question: str):
+def chat_with_collection(collection_name: str, question: str, session_id: uuid, db: Session):
     try:
-        table_name = "message_history"
-
-        session_id = "9016aef4-5a67-4c2f-b829-f90e1aff4227"
-
-        # Initialize the chat history manager
-        chat_history_db = PostgresChatMessageHistory(
-            table_name,
-            session_id,
-            sync_connection=sync_connection
-        )
+        username = "sokheang"
+        file_name = username+session_id
+        file = file_name+".txt"
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        history_dir = os.path.join(current_dir,"history")
+        file_dir = os.path.join(history_dir, file)
         
-        # Get the chat history from postgres database
-        chat_history = chat_history_db.get_messages()
+        result = crud.get_histoy_by_session_id(db, session_id)
+        print("result : ",result)
         
+        # If no history found, get from the chat history of the session_id
+        if result == None:
+            # Insert to database
+            history_data = schemas.HistoryMessageCreate(
+                user_id=1,
+                session_id=session_id,
+                history_id=file
+            )
+            crud.create_history_message(db, history_data)
+        else:
+            """
+                get from MinIO if history message id exist
+            """ 
+            if not os.path.exists(file_dir):
+                dependencies.download_file_from_MinIO(username, file, file_dir)
+            
+        
+        """check if the directory exists"""
+        chat_history=[]
+        if os.path.exists(file_dir):
+            with open(file_dir, "r") as text_file:
+                data = text_file.readlines()
+            chat_history = data
+        
+        """"Invoke chatbot"""
         retriever = retrieval_collection(collection_name)
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
         
-        chat_history_db.add_user_message(message=question)
-        chat_history_db.add_ai_message(message=result['answer'])
+        new_chat_history = []
+        new_chat_history.append(HumanMessage(question))
+        new_chat_history.append(SystemMessage(result['answer']))
+
+        # write to local file
+        from .dependencies import write_history_message
+        write_history_message(new_chat_history, file_dir)
         
-        return result
+        return result['answer']
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
