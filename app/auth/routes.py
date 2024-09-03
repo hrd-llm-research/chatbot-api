@@ -1,13 +1,12 @@
-from app.auth.database import SessionLocal, engine
+from app.auth.database import engine
 from app.auth import models, schemas, crud, dependencies
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Annotated
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.utils import get_db
-from fastapi.security import OAuth2PasswordBearer
 
 models.Base.metadata.create_all(bind=engine)
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -15,8 +14,6 @@ router = APIRouter(
     prefix="/users",
     tags={"users"}
 )
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @router.post("/register")
 async def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -47,12 +44,4 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()] , db:
     access_token = dependencies.create_access_token(
         data={"email": user.email}, expires_delta=access_token_expires
     )
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Login successfully.",
-            "success": True,
-            "payload": user.to_dict(),
-            "access_token" : schemas.Token(access_token=access_token,token_type= "bearer").to_dict(),
-        }
-    )
+    return {"access_token": access_token, "token_type": "bearer"}

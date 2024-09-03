@@ -17,12 +17,10 @@ def upload_to_vectorstore(filename: str):
         file_dir = os.path.join(current_dir,"docs_resources", filename)
         
         COLLECTION_NAME = filename
-        print("Filename: ", filename)
         
         if not os.path.exists(file_dir):
             raise FileNotFoundError(f"File {filename} was not found.")
-        
-        print(f"file_dir: {file_dir}")
+
         embedding = FastEmbedEmbeddings() 
         
         if filename.endswith(".txt"):

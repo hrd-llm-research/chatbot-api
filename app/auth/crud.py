@@ -1,7 +1,7 @@
 from . import models, schemas, dependencies
 from sqlalchemy.orm import Session
 
-def get_user_email(db: Session, email: str):
+def get_user_by_email(db: Session, email: str):
     user_db = db.query(models.User).filter(models.User.email == email).first()
     return user_db
     
