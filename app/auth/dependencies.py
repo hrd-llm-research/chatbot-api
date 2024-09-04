@@ -1,5 +1,3 @@
-from jose import JWTError, jwt 
-
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -8,9 +6,10 @@ from app.auth import crud
 from typing import Annotated
 from fastapi import Depends,HTTPException, status
 from app.auth.schemas import TokenData, User, UserResponse
-from jwt.exceptions import InvalidTokenError
 from sqlalchemy.orm import Session
 from typing import Optional
+
+import jwt
 
 # to get a string like this run:
 # openssl rand -hex 32
@@ -62,9 +61,6 @@ async def get_current_user(
     )
     
     try:
-        # Log the received token for debugging
-        print(f"Token received: {token}")
-
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("email")
         if email is None:
@@ -77,9 +73,10 @@ async def get_current_user(
         
         return user
 
-    except JWTError as e:
+    except Exception as e:
         print(f"Invalid token: {e}")
         raise credentials_exception
+    
 async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ):

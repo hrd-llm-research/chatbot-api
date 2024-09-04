@@ -1,0 +1,23 @@
+Andong    Type-B	Data Science
+Cheongju   Type-B	Big Data
+Chonnam	  Type-B	Data Science	general / R&D
+Dong-A	  Type-B	Data Science
+Ewha Woman  Type-A	Big data analytics
+Hankuk	   Type-A 	Data Analytics
+Hoseo	  Type-B	Data Science
+KAIST 	  Type-A 	Graduate School of Data Science
+Kookmin   Type-A	Data Science
+Pukyong	  Type-B	Statistic and Data Science / Big Data Convergence / Data Engineering
+SeoulNational  Type-A	Data Science / R&D
+Sookmyung Women	Type A	Big Data Analysis Convergence
+Univ. Seoul   Type-A	Statistic Data Science
+
+
+
+
+
+
+
+
+
+

@@ -1,6 +1,5 @@
 from minio import Minio
 from minio.error import S3Error
-import os
 
 minio_client = Minio(
     "localhost:9000",
@@ -13,7 +12,6 @@ def upload_file(bucket_name: str,object_name, file: str):
     """"
         Upload a file to MinIO storage
     """
-    print(f"object_name: {object_name}, file: {file}")
     try:
 
         if not minio_client.bucket_exists(bucket_name):

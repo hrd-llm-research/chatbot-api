@@ -11,6 +11,7 @@ from app.auth.schemas import User
 from app.auth.dependencies import get_current_active_user, transform_user_dto
 from typing import Annotated
 from app.auth.crud import get_user_by_email
+# from langsmith import traceable
 
 router = APIRouter(
     prefix="/chatbot",
@@ -38,6 +39,8 @@ async def read_chat_with_collection(
     response = chat_with_collection(request.collection_name, request.input, session_id, db, transform_user)
     return response
 
+
+# @traceable
 @router.post("/create_new_chat")
 async def create_new_chat(
     current_user: Annotated[User, Depends(get_current_active_user)], 
