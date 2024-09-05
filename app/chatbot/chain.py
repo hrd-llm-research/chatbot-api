@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.message_history import dependencies
 from app.auth.schemas import UserResponse
 from langchain_chroma import Chroma
+from langchain_ollama import ChatOllama
 
 load_dotenv()
 
@@ -23,6 +24,13 @@ embeddings = FastEmbedEmbeddings()
 llm = ChatGroq(
     model=os.environ.get('OPENAI_MODEL_NAME')
 )
+
+"""" use local model ollama"""
+
+# llm = ChatOllama(
+#     model="llama3.1",
+#     temperature=0.7
+# )
 
 
 def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=3, score_threshold: float=0.5):
@@ -208,6 +216,8 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         retriever = retrieval_document_from_chroma(chroma_db_name)
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
         
+        response = parseResponse(result['answer'])
+        
         new_chat_history = []
         new_chat_history.append(HumanMessage(question))
         new_chat_history.append(SystemMessage(result['answer']))
@@ -216,6 +226,10 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         from .dependencies import write_history_message
         write_history_message(new_chat_history, file_dir)
         
-        return result['answer']
+        return response
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
+    
+def parseResponse(response):
+    result = response.strip().replace("\n","")
+    return result

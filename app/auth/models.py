@@ -17,6 +17,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String)
     is_active = Column(Boolean, default=True)
+    api_key = Column(String, nullable=True)
     history_messages = relationship("HistoryMessage", back_populates="user")
     chroma_db = relationship('ChromaDB', back_populates="user")
 
@@ -45,6 +46,7 @@ class ChromaDB(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     chroma_name = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.now())
+    for_api_generated = Column(Boolean, default=False)
     
     user = relationship('User', back_populates="chroma_db")
-    
+   

@@ -1,0 +1,1 @@
+HumanMessage(content='how many product do we have? what are they?'),SystemMessage(content='[(1, 'Laptop'), (2, 'Smartphone'), (3, 'Tablet'), (4, 'Headphones'), (5, 'Smartwatch')]'),

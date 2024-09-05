@@ -18,7 +18,7 @@ router = APIRouter(
     tags=["npl2sql"]
 )
 """postgresql+psycopg2://postgres:123@localhost:5433/btb_homework_db"""
-@router.post("/chat")
+# @router.post("/chat")
 def npl2sql(request: schemas.NPLRequest):
     result = chain.npl2sql(request)
     return JSONResponse(
@@ -36,7 +36,7 @@ def database_connection(database_type: dependencies.Database,request: dependenci
     db = dependencies.db_connection(request,database_type )
     return db
 
-@router.post("/classify_question")
+# @router.post("/classify_question")
 def classify_question(
     question: str, 
     db: Session = Depends(database_connection)
@@ -88,5 +88,22 @@ async def save_chat_session(
         content={
             "message": "Chat session have been saved successfully",
             "success": True,
+        }
+    )
+    
+@router.post("/generate_sql")
+async def sql_generation(
+    question, 
+    database_type: dependencies.Database,
+    connection_request: dependencies.DatabaseConnectionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)], 
+):
+    response = chain.sql_generation(question, database_type.value, connection_request)
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={
+            "message": "Chat session have been saved successfully",
+            "success": True,
+            "payload":response
         }
     )

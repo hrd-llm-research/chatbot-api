@@ -30,7 +30,7 @@ class InvokeRequest(BaseModel):
 class CollectionRequest(InvokeRequest):
     collection_name: str
 
-@router.post("/chat_with_collection")
+# @router.post("/chat_with_collection")
 async def read_chat_with_collection(
     request: CollectionRequest,
     session_id,
@@ -60,7 +60,7 @@ async def read_chat_with_chroma_db(
         content={
             "message": "Chat session started with session ID: {}".format(session_id),
             "success": True,
-            "session_id": response,
+            "payload": response,
         }
     )
 
