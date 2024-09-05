@@ -34,7 +34,7 @@ class HistoryMessage(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     session_id = Column(UUID(as_uuid=True))
-    history_id = Column(String)
+    history_message_file = Column(String)
     user = relationship("User", back_populates="history_messages")    
     
     

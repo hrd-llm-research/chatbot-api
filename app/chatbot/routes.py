@@ -13,6 +13,10 @@ from typing import Annotated
 from app.auth.crud import get_user_by_email
 # from langsmith import traceable
 
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 router = APIRouter(
     prefix="/chatbot",
     tags={"chatbot"}
@@ -89,7 +93,7 @@ async def save_chat_session(
     user = get_user_by_email(db, current_user.email)
     transform_user = transform_user_dto(user)
 
-    dependencies.save_message_to_minio(db, session_id, transform_user)
+    dependencies.save_message_to_minio(db, session_id, transform_user, current_dir)
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={

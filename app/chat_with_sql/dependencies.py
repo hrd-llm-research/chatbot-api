@@ -3,7 +3,8 @@ from pydantic import BaseModel
 
 class Database(Enum):
     POSTGRES = "postgresql"
-    
+    MYSQL = "mysql"
+        
 class DatabaseConnectionRequest(BaseModel):
     username: str
     password: str

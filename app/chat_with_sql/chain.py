@@ -1,4 +1,5 @@
 import os
+import uuid
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
@@ -11,6 +12,9 @@ from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool, Qu
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableBranch
 from sqlalchemy.orm import Session
+from app.chatbot.crud import create_history_message, get_histoy_by_session_id
+from app.message_history.dependencies import download_file_from_MinIO
+from app.chatbot.schemas import HistoryMessageCreate
 
 load_dotenv()
 
@@ -33,6 +37,7 @@ my_prompt_template = """You are a SQL expert of {dialect}.
 
 def parseResponseToSQL(response):
     # return response.strip().replace("```", "").replace("SQL Script:","")
+
     if "SQLQuery:" in response:
         sql_query = response.split("SQLQuery:")[1].strip()
         
@@ -118,13 +123,18 @@ from langchain_core.runnables import RunnableBranch
 from langchain_core.messages import HumanMessage, SystemMessage
 
     
-def npl_with_history(question):
+def npl_with_history(question: str, session_id: uuid, database_type, database_connection, db1, user):
+    file_name = user.username+"@"+session_id+".txt"
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     history_dir = os.path.join(current_dir,"history")
-    file_dir = os.path.join(history_dir, "test.txt")
+    file_dir = os.path.join(history_dir, file_name)
     
     # db = SQLDatabase.from_uri(db)
-    db = SQLDatabase.from_uri("postgresql+psycopg2://postgres:123@localhost:5433/btb_homework_db")
+    if database_type == "postgresql":
+        db = SQLDatabase.from_uri(f"postgresql+psycopg2://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
+    elif database_type == "mysql":
+        db = SQLDatabase.from_uri(f"mysql+pymysql://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
     
     executed_query = QuerySQLDataBaseTool(db=db)
     write_query = create_sql_query_chain(llm=llm, db=db)
@@ -182,6 +192,25 @@ def npl_with_history(question):
         lambda output: {"response": f"unable to classify the question."}  # Default response if none match
     )
     
+    """" Get history messages"""
+    result = get_histoy_by_session_id(db1, session_id)
+    print("result: ",  result)
+    
+    if result == None:
+            # Insert to database
+            history_data = HistoryMessageCreate(
+                user_id=user.id,
+                session_id=session_id,
+                history_message_file=file_name
+            )
+            create_history_message(db1, history_data)
+    else:
+        """
+            get from MinIO if history message id exist
+        """ 
+        if not os.path.exists(file_dir):
+            download_file_from_MinIO(user.username, file_name, file_dir)
+                
     # read history from file
     chat_history=[]
     if os.path.exists(file_dir):

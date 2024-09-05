@@ -134,7 +134,7 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
             history_data = schemas.HistoryMessageCreate(
                 user_id=user.id,
                 session_id=session_id,
-                history_id=file
+                history_message_file=file
             )
             crud.create_history_message(db, history_data)
         else:
@@ -186,7 +186,7 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
             history_data = schemas.HistoryMessageCreate(
                 user_id=user.id,
                 session_id=session_id,
-                history_id=file
+                history_message_file=file
             )
             crud.create_history_message(db, history_data)
         else:
