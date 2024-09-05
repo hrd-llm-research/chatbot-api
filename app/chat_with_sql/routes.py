@@ -11,9 +11,14 @@ router = APIRouter(
 @router.post("/chat")
 def npl2sql(request: schemas.NPLRequest):
     result = chain.npl2sql(request)
-    return {
-        "payload": result
-    }
+    return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content={
+                "message": "Message was generated successfully.",
+                "payload": result,
+                "success": True,
+            }
+    )
     
     
 # @router.post("/database_connection")
@@ -21,7 +26,7 @@ def database_connection(database_type: dependencies.Database,request: dependenci
     db = dependencies.db_connection(request,database_type )
     return db
 
-@router.post("classify_question")
+@router.post("/classify_question")
 def classify_question(
     question: str, 
     db: Session = Depends(database_connection)
@@ -31,7 +36,7 @@ def classify_question(
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content={
-                "message": "You are registered successfully.",
+                "message": "Message was generated successfully.",
                 "payload": result,
                 "success": True,
             }
@@ -42,3 +47,8 @@ def classify_question(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=result,
     )
+    
+@router.post("/npl_with_memory")
+def npl_with_memory(question):
+    result = chain.npl_with_history(question)
+    return result

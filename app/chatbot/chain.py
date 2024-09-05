@@ -14,6 +14,7 @@ from . import crud, schemas
 from sqlalchemy.orm import Session
 from app.message_history import dependencies
 from app.auth.schemas import UserResponse
+from langchain_chroma import Chroma
 
 load_dotenv()
 
@@ -23,10 +24,13 @@ llm = ChatGroq(
     model=os.environ.get('OPENAI_MODEL_NAME')
 )
 
-def retriveal_documents(top_k: int=3, score_threshold: float=0.5):
-    vector_store = PGVector(
-        connection_string=CONNECTION_STRING,
-        embedding_function=embeddings
+
+def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=3, score_threshold: float=0.5):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    persistent_dir = os.path.join(current_dir, "..", "file_upload", "chroma_db", chroma_db_name)
+    vector_store = Chroma(
+        embedding_function=embeddings,
+        persist_directory=persistent_dir
     )
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
@@ -150,6 +154,58 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
         
         """"Invoke chatbot"""
         retriever = retrieval_collection(collection_name)
+        result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
+        
+        new_chat_history = []
+        new_chat_history.append(HumanMessage(question))
+        new_chat_history.append(SystemMessage(result['answer']))
+
+        # write to local file
+        from .dependencies import write_history_message
+        write_history_message(new_chat_history, file_dir)
+        
+        return result['answer']
+    except Exception as exception:
+        return {"error": "An unexpected error occurred.", "detail": str(exception)}
+    
+    
+def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db: Session, user: UserResponse):
+    try:
+        # store message using txt
+        file_name = user.username+"@"+session_id
+        file = file_name+".txt"
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        history_dir = os.path.join(current_dir,"history")
+        file_dir = os.path.join(history_dir, file)
+        
+        result = crud.get_histoy_by_session_id(db, session_id)
+        
+        # If no history found, get from the chat history of the session_id
+        if result == None:
+            # Insert to database
+            history_data = schemas.HistoryMessageCreate(
+                user_id=user.id,
+                session_id=session_id,
+                history_id=file
+            )
+            crud.create_history_message(db, history_data)
+        else:
+            """
+                get from MinIO if history message id exist
+            """ 
+            if not os.path.exists(file_dir):
+                dependencies.download_file_from_MinIO(user.username, file, file_dir)
+            
+        
+        """check if the directory exists"""
+        chat_history=[]
+        if os.path.exists(file_dir):
+            with open(file_dir, "r") as text_file:
+                data = text_file.readlines()
+            chat_history = data
+        
+        """"Invoke chatbot"""
+        retriever = retrieval_document_from_chroma(chroma_db_name)
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
         
         new_chat_history = []

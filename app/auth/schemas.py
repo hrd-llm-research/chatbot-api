@@ -29,3 +29,11 @@ class UserCreate(User):
     
 class UserInDB(User):
     password: str
+    
+    
+class ChromaSchemaDB(BaseModel):
+    id: int
+    user_id:int
+    chroma_name: str
+    class Config:
+        from_attributes = True

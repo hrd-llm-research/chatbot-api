@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .chain import chat_with_collection
+from .chain import chat_with_collection, chat_with_chroma_db
 from pydantic import BaseModel
 import uuid
 from app.utils import get_db
@@ -39,6 +39,26 @@ async def read_chat_with_collection(
     response = chat_with_collection(request.collection_name, request.input, session_id, db, transform_user)
     return response
 
+@router.post("/chat_with_chroma_db")
+async def read_chat_with_chroma_db(
+    chroma_db_name: str,
+    question: str,
+    session_id,
+    current_user: Annotated[User, Depends(get_current_active_user)], 
+    db: Session = Depends(get_db)
+):
+    user = get_user_by_email(db, current_user.email)
+    transform_user = transform_user_dto(user)
+    
+    response = chat_with_chroma_db(chroma_db_name, question, session_id, db, transform_user)
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={
+            "message": "Chat session started with session ID: {}".format(session_id),
+            "success": True,
+            "session_id": response,
+        }
+    )
 
 # @traceable
 @router.post("/create_new_chat")
