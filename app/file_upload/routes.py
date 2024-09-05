@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 
-@router.post("/file_upload")
+# @router.post("/file_upload")
 async def file_upload(
     current_user: Annotated[User, Depends(get_current_active_user)],
     file: UploadFile = File(...), 

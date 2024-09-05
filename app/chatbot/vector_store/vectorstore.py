@@ -47,8 +47,8 @@ def upload_to_vectorstore(filename: str):
             use_jsonb=True
         )
         return COLLECTION_NAME
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=e)
+    except Exception as exception:
+        raise HTTPException(status_code=400, detail=str(exception))
 
 
 

@@ -16,6 +16,7 @@ from app.chatbot.crud import create_history_message, get_histoy_by_session_id
 from app.message_history.dependencies import download_file_from_MinIO
 from app.chatbot.schemas import HistoryMessageCreate
 from langchain_ollama import ChatOllama
+from fastapi import HTTPException,status
 
 load_dotenv()
 
@@ -243,17 +244,26 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
         write_history_message(new_chat_history, file_dir)
         
         return result
-    except Exception:
-        raise    
+    except Exception as exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(exception) 
+        )    
     
     
 def sql_generation(question: str, database_type, database_connection):
-
-    if database_type == "postgresql":
-        db = SQLDatabase.from_uri(f"postgresql+psycopg2://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
-    elif database_type == "mysql":
-        db = SQLDatabase.from_uri(f"mysql+pymysql://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
-        
-    write_query = create_sql_query_chain(llm=llm, db=db)
-    result = write_query.invoke({"question":question})
-    return parseResponseToSQL(result)
+    try:
+        if database_type == "postgresql":
+            db = SQLDatabase.from_uri(f"postgresql+psycopg2://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
+        elif database_type == "mysql":
+            db = SQLDatabase.from_uri(f"mysql+pymysql://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
+            
+        write_query = create_sql_query_chain(llm=llm, db=db)
+        result = write_query.invoke({"question":question})
+        return parseResponseToSQL(result)
+    except Exception as exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(exception)
+            
+        )    

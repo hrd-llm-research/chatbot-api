@@ -16,6 +16,7 @@ from app.message_history import dependencies
 from app.auth.schemas import UserResponse
 from langchain_chroma import Chroma
 from langchain_ollama import ChatOllama
+from fastapi import HTTPException,status
 
 load_dotenv()
 
@@ -36,6 +37,11 @@ llm = ChatGroq(
 def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=3, score_threshold: float=0.5):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     persistent_dir = os.path.join(current_dir, "..", "file_upload", "chroma_db", chroma_db_name)
+    if not os.path.exists(persistent_dir):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Chroma database '{chroma_db_name}' does not exist in the directory."
+        )
     vector_store = Chroma(
         embedding_function=embeddings,
         persist_directory=persistent_dir
@@ -186,6 +192,13 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         history_dir = os.path.join(current_dir,"history")
         file_dir = os.path.join(history_dir, file)
         
+        persistent_dir = os.path.join(current_dir, "..", "file_upload", "chroma_db", chroma_db_name)
+        if not os.path.exists(persistent_dir):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chroma database '{chroma_db_name}' does not exist in the directory."
+            )
+        
         result = crud.get_histoy_by_session_id(db, session_id)
         
         # If no history found, get from the chat history of the session_id
@@ -228,7 +241,10 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         
         return response
     except Exception as exception:
-        return {"error": "An unexpected error occurred.", "detail": str(exception)}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(exception)
+        )
     
 def parseResponse(response):
     result = response.strip().replace("\n","")
