@@ -2,7 +2,7 @@ from minio import Minio
 from minio.error import S3Error
 
 minio_client = Minio(
-    "localhost:9000",
+    "110.74.194.123:9000",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False # Set to True if you have configured TLS/SSL

@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fastapi import FastAPI, Depends, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
 from app.auth.routes import router as auth_routes
@@ -23,16 +23,25 @@ app.include_router(file_upload_routes, prefix="/api/v1")
 app.include_router(chat_with_sql_routes, prefix="/api/v1")
 app.include_router(api_generated_routes, prefix="/api/v1")
 
-@app.middleware("http")
-async def db_session_middleware(request: Request, call_next):
-    response = Response("Internal server error", status_code=500)
-    try:
-        request.state.db = SessionLocal()
-        response = await call_next(request)
-    finally:
-        request.state.db.close()
-    return response
+# @app.middleware("http")
+# async def db_session_middleware(request: Request, call_next):
+#     response = Response("Internal server error", status_code=500)
+#     try:
+#         request.state.db = SessionLocal()
+#         response = await call_next(request)
+#     finally:
+#         request.state.db.close()
+#     return response
+
+
+# from app.chatbot.test_chain import chain
+
+# add_routes(
+#     app,
+#     chain,
+#     path="/chat_serve"
+# )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=8001)

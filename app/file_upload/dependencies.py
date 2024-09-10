@@ -12,12 +12,21 @@ from langchain_chroma import Chroma
 from langchain_community.embeddings import FastEmbedEmbeddings
 from dotenv import load_dotenv
 from . import crud
-
+from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Create embeddings without GPU
 embedding = FastEmbedEmbeddings()
+
+# Create embeddings with GPU
+# embedding = HuggingFaceEmbeddings(
+#     model_name="BAAI/bge-small-en-v1.5",
+#     model_kwargs={'device': 'cuda'},  # Use GPU if available
+#     encode_kwargs={'normalize_embeddings': True}
+# )
 
 def file_upload_to_db(db: Session, file, user: schemas.User):
     try:
@@ -89,22 +98,35 @@ def upload_file_to_chroma(db, file, user, session_id):
         
         # Create an instance of the Chroma class
         chroma_instance = Chroma(collection_name="mycollection", embedding_function=embedding)
-        # condition: if there chroma name already exists
-        if not chroma_data:
-        # insert chroma database name to database
-            chroma_data = crud.create_chroma(db, user.id, chroma_name)
-            
-            chroma_instance.from_documents(
+        chroma_data = crud.create_chroma(db, user.id, chroma_name)
+        
+        chroma_instance.from_documents(
                 documents=chunks, 
                 persist_directory=persistent_dir, 
                 embedding=embedding
             )
-        else:
-            chroma_instance.add_documents(
-                documents=chunks,
-                persist_directory=persistent_dir, 
-                embedding=embedding
-            )
+        # chroma_instance.add_documents(
+        #     documents=chunks,
+        #     persist_directory=persistent_dir, 
+        # )
+        
+        
+        # condition: if there chroma name already exists
+        # if not chroma_data:
+        # # insert chroma database name to database
+        #     chroma_data = crud.create_chroma(db, user.id, chroma_name)
+            
+        #     chroma_instance.from_documents(
+        #         documents=chunks, 
+        #         persist_directory=persistent_dir, 
+        #         # embedding=embedding
+        #     )
+        # else:
+        #     chroma_instance.add_documents(
+        #         documents=chunks,
+        #         persist_directory=persistent_dir, 
+        #         # embedding=embedding
+        #     )
         
         
         # remove the file from the directory

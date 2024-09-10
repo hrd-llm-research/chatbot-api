@@ -18,5 +18,5 @@ CONNECTION_STRING = PGVector.connection_string_from_db_params(
 
 db_conn = PgvectorService(CONNECTION_STRING)
 
-conn_info = "postgresql://postgres:123@localhost:5434/chatbot_api" 
+conn_info = "postgresql://postgres:123@110.74.194.123:6000/chatbot_api" 
 sync_connection = psycopg.connect(conn_info)

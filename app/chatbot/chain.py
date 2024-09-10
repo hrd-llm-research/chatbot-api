@@ -15,12 +15,20 @@ from sqlalchemy.orm import Session
 from app.message_history import dependencies
 from app.auth.schemas import UserResponse
 from langchain_chroma import Chroma
-from langchain_ollama import ChatOllama
 from fastapi import HTTPException,status
+from langchain_community.llms import Ollama
 
 load_dotenv()
 
+# Create embeddings without GPU
 embeddings = FastEmbedEmbeddings()
+
+# Create embeddings with GPU
+# embedding = HuggingFaceEmbeddings(
+#     model_name="BAAI/bge-small-en-v1.5",
+#     model_kwargs={'device': 'cuda'},  # Use GPU if available
+#     encode_kwargs={'normalize_embeddings': True}
+# )
 
 llm = ChatGroq(
     model=os.environ.get('OPENAI_MODEL_NAME')
@@ -28,9 +36,9 @@ llm = ChatGroq(
 
 """" use local model ollama"""
 
-# llm = ChatOllama(
-#     model="llama3.1",
-#     temperature=0.7
+# llm = Ollama(
+#     model = "llama3.1", 
+#     temperature=0.7,
 # )
 
 
@@ -127,13 +135,13 @@ def create_chain(retriever):
 
     # Create retriver chain that combines the history-aware retriever and the question anwering
     rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-    
+    # chain = rag_chain | StrOutputParser()
+    # return chain
     return rag_chain
 
 
 def chat_with_collection(collection_name: str, question: str, session_id: uuid, db: Session, user: UserResponse):
     try:
-        username = "sokheang"
         file_name = user.username+session_id
         file = file_name+".txt"
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -169,7 +177,7 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
         """"Invoke chatbot"""
         retriever = retrieval_collection(collection_name)
         result = create_chain(retriever).invoke({"input":question, "chat_history":chat_history})
-        
+
         new_chat_history = []
         new_chat_history.append(HumanMessage(question))
         new_chat_history.append(SystemMessage(result['answer']))
@@ -182,7 +190,7 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
     
-    
+
 def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db: Session, user: UserResponse):
     try:
         # store message using txt
@@ -198,32 +206,23 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
                 status_code=404,
                 detail=f"Chroma database '{chroma_db_name}' does not exist in the directory."
             )
-        
-        result = crud.get_histoy_by_session_id(db, session_id)
-        
-        # If no history found, get from the chat history of the session_id
-        if result == None:
-            # Insert to database
-            history_data = schemas.HistoryMessageCreate(
-                user_id=user.id,
-                session_id=session_id,
-                history_message_file=file
-            )
-            crud.create_history_message(db, history_data)
-        else:
-            """
-                get from MinIO if history message id exist
-            """ 
-            if not os.path.exists(file_dir):
-                dependencies.download_file_from_MinIO(user.username, file, file_dir)
             
         
         """check if the directory exists"""
         chat_history=[]
-        if os.path.exists(file_dir):
-            with open(file_dir, "r") as text_file:
-                data = text_file.readlines()
-            chat_history = data
+        
+        # get history from database
+        result_from_db = crud.get_histoy_by_session_id(db, session_id)
+        # if exists
+        if not result_from_db == None:
+            # if there is message history then download minIO server
+            if not os.path.exists(file_dir):
+                dependencies.download_file_from_MinIO(user.username, file, file_dir)
+               
+            if os.path.exists(file_dir):
+                with open(file_dir, "r") as text_file:
+                    data = text_file.readlines()
+                chat_history = data
         
         """"Invoke chatbot"""
         retriever = retrieval_document_from_chroma(chroma_db_name)
@@ -232,14 +231,25 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         response = parseResponse(result['answer'])
         
         new_chat_history = []
-        new_chat_history.append(HumanMessage(question))
-        new_chat_history.append(SystemMessage(result['answer']))
+        new_chat_history.append(HumanMessage(content=question))
+        new_chat_history.append(SystemMessage(content=result['answer']))
 
+        # If no history found, store message history key into database
+        if result_from_db == None:
+            # Insert to database
+            history_data = schemas.HistoryMessageCreate(
+                user_id=user.id,
+                session_id=session_id,
+                history_message_file=file
+            )
+            crud.create_history_message(db, history_data) 
+            
         # write to local file
         from .dependencies import write_history_message
         write_history_message(new_chat_history, file_dir)
-        
+
         return response
+        
     except Exception as exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -247,5 +257,5 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
         )
     
 def parseResponse(response):
-    result = response.strip().replace("\n","")
+    result = response.strip().replace("\n","").replace("SystemMessage(content='", "").replace("')","").replace('\"', '')
     return result

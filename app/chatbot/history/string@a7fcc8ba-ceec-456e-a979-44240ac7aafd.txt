@@ -1,0 +1,12 @@
+HumanMessage(content='what is html'),SystemMessage(content='Based on the provided document, HTML is described as a language for describing web pages.
+
+According to the document:
+
+"HTML stands for Hyper Text Markup Language
+HTML is a markup language
+A markup language is a set of markup tags
+The tags describe document content
+HTML documents contain HTML tags and plain text
+HTML documents are also called web pages"
+
+In other words, HTML is a language used to create and structure content on the web, using a set of markup tags to describe the content and its purpose.'),HumanMessage(content='what is css'),SystemMessage(content='Based on the provided document, CSS stands for Cascading Style Sheets.'),

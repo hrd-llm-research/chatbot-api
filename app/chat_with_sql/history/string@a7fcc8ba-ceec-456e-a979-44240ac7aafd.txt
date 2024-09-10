@@ -1,0 +1,1 @@
+HumanMessage(content='list all department'),SystemMessage(content='[(1, 'Sales'), (2, 'Marketing'), (3, 'HR'), (4, 'Finance'), (5, 'IT'), (6, 'Operations'), (7, 'Research')]'),

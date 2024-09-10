@@ -15,8 +15,9 @@ from sqlalchemy.orm import Session
 from app.chatbot.crud import create_history_message, get_histoy_by_session_id
 from app.message_history.dependencies import download_file_from_MinIO
 from app.chatbot.schemas import HistoryMessageCreate
-from langchain_ollama import ChatOllama
 from fastapi import HTTPException,status
+from langchain_community.llms import Ollama
+
 
 load_dotenv()
 
@@ -26,11 +27,10 @@ llm = ChatGroq(
 
 """" use local model ollama"""
 
-# llm = ChatOllama(
-#     model="llama3.1",
-#     temperature=0.7
-# )
-    
+# llm = Ollama(
+#     model = "llama3.1", 
+#     temperature=0.7,
+# )    
 
 my_prompt_template = """You are a SQL expert of {dialect}. 
    Please write an SQL query base on this question: "{question}" and pay attention to use only the column names you can see in the tables below.
@@ -202,29 +202,22 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
         )
         
         """" Get history messages"""
-        result = get_histoy_by_session_id(db1, session_id)
-        print("result: ",  result)
-        
-        if result == None:
-                # Insert to database
-                history_data = HistoryMessageCreate(
-                    user_id=user.id,
-                    session_id=session_id,
-                    history_message_file=file_name
-                )
-                create_history_message(db1, history_data)
-        else:
-            """
-                get from MinIO if history message id exist
-            """ 
-            if not os.path.exists(file_dir):
-                download_file_from_MinIO(user.username, file_name, file_dir)
+        result_from_db = get_histoy_by_session_id(db1, session_id)
                     
         # read history from file
         chat_history=[]
-        if os.path.exists(file_dir):
-            with open(file_dir, "r") as text_file:
-                data = text_file.readlines()
+        
+        # if exists
+        if not result_from_db == None:
+            """
+                if there is message history then download minIO server
+            """ 
+            if not os.path.exists(file_dir):
+                download_file_from_MinIO(user.username, file_name, file_dir)
+               
+            if os.path.exists(file_dir):
+                with open(file_dir, "r") as text_file:
+                    data = text_file.readlines()
                 chat_history = data
 
         # invoke history aware function
@@ -239,11 +232,27 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
         new_chat_history.append(HumanMessage(content=question))
         new_chat_history.append(SystemMessage(content=result))
             
-        # write to local file
+        """
+            If no history found, store message history key into database
+        """
+        if result == None:
+                # Insert to database
+                history_data = HistoryMessageCreate(
+                    user_id=user.id,
+                    session_id=session_id,
+                    history_message_file=file_name
+                )
+                create_history_message(db1, history_data)
+
+
+        """
+            write to local file
+        """
         from app.chatbot.dependencies import write_history_message
         write_history_message(new_chat_history, file_dir)
-        
+
         return result
+    
     except Exception as exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -260,10 +269,11 @@ def sql_generation(question: str, database_type, database_connection):
             
         write_query = create_sql_query_chain(llm=llm, db=db)
         result = write_query.invoke({"question":question})
+        
         return parseResponseToSQL(result)
+    
     except Exception as exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=str(exception)
-            
         )    

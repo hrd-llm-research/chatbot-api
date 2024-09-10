@@ -17,10 +17,15 @@ import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+
+
 router = APIRouter(
     prefix="/chatbot",
     tags={"chatbot"}
 )
+
+
+
     
 class InvokeRequest(BaseModel):
     input: str
@@ -43,6 +48,7 @@ async def read_chat_with_collection(
     response = chat_with_collection(request.collection_name, request.input, session_id, db, transform_user)
     return response
 
+
 @router.post("/chat_with_chroma_db")
 async def read_chat_with_chroma_db(
     chroma_db_name: str,
@@ -53,6 +59,7 @@ async def read_chat_with_chroma_db(
 ):
     user = get_user_by_email(db, current_user.email)
     transform_user = transform_user_dto(user)
+
     
     response = chat_with_chroma_db(chroma_db_name, question, session_id, db, transform_user)
     return JSONResponse(
@@ -101,3 +108,5 @@ async def save_chat_session(
             "success": True,
         }
     )
+    
+

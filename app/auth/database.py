@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Connect to the SQLite database
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:123@localhost:5434/chatbot_api"
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:123@110.74.194.123:6000/chatbot_api"
 
 Base = declarative_base()
 
