@@ -6,7 +6,7 @@ from app.auth.dependencies import get_current_active_user, transform_user_dto
 from app.auth.crud import get_user_by_email
 from typing import Annotated
 from app.auth.schemas import User
-from .dependenies import generate_api_key
+from .dependenies import generate_api_key,custom_chat
 
 router = APIRouter(
     prefix="/api generator",
@@ -30,3 +30,11 @@ def create_api_key(
             "success": True,
         }
     )
+
+
+from .schemas import Provider, Model
+@router.post("/custom_chatModel")
+async def custom_chat_model(provider: Provider, model: Model, API_KEY: str,question:str):
+    llm = custom_chat(provider, model, API_KEY)
+    result = llm.invoke(question)
+    return result

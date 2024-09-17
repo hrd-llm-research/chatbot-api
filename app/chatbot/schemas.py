@@ -6,3 +6,6 @@ class HistoryMessageCreate(BaseModel):
     session_id: str
     history_message_file: str
 
+class AIMessage(BaseModel):
+    message: str
+    session_id: str

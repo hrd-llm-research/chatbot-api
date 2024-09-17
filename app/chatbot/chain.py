@@ -17,6 +17,7 @@ from app.auth.schemas import UserResponse
 from langchain_chroma import Chroma
 from fastapi import HTTPException,status
 from langchain_community.llms import Ollama
+from langsmith import traceable
 
 load_dotenv()
 
@@ -31,7 +32,11 @@ embeddings = FastEmbedEmbeddings()
 # )
 
 llm = ChatGroq(
-    model=os.environ.get('OPENAI_MODEL_NAME')
+    model=os.environ.get('OPENAI_MODEL_NAME'),
+    # model="Mixtral-8x7b-32768",
+    temperature=1,
+    max_tokens=3225
+    # top_p=0.9  # Nucleus sampling with top_p of 0.9
 )
 
 """" use local model ollama"""
@@ -39,10 +44,11 @@ llm = ChatGroq(
 # llm = Ollama(
 #     model = "llama3.1", 
 #     temperature=0.7,
+    
 # )
 
-
-def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=3, score_threshold: float=0.5):
+@traceable()
+def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=10, score_threshold: float=0.3):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     persistent_dir = os.path.join(current_dir, "..", "file_upload", "chroma_db", chroma_db_name)
     if not os.path.exists(persistent_dir):
@@ -59,6 +65,7 @@ def retrieval_document_from_chroma(chroma_db_name: str, top_k: int=3, score_thre
         search_kwargs={"k": top_k, "score_threshold": score_threshold},
     )
     return retriever
+
 
 def retrieval_collection(collection_name: str, top_k: int=5, score_threshold: float = 0.5):
     vector_store = PGVector(
@@ -108,11 +115,18 @@ def create_chain(retriever):
     # Answer and question prompt
     qa_system_prompt = (
         """
-            You are a knowledgeable assistant designed to help users find information from documents they have uploaded. 
-            You have access to the content of the document and can provide precise answers based on the text within the document. 
-            Always base your responses solely on the information available in the document. 
-            If the answer to a user's question is not found in the document, respond by letting them know that the information is not available. 
-            Keep your answers clear, concise, and relevant to the user's query.
+            You are a knowledgeable assistant designed to assist users by answering questions based on the content of documents they have retrieved. You can also use the chat history to provide additional context for the current conversation. Your task is to generate a detailed, thoughtful, and well-rounded answer based on the retrieved documents and the user's current question.
+
+            When formulating your response:
+
+            Prioritize using the retrieved documents to provide fact-based, relevant, and accurate answers.
+            Elaborate where possible, including examples, further context, and multiple perspectives if applicable.
+            If multiple documents are retrieved, synthesize information from them to offer a comprehensive answer, combining key points.
+            Vary your responses to similar questions by offering new details, angles, or deeper insights each time the question is asked.
+            If no relevant information is found in the retrieved documents, let the user know politely and suggest alternative ways to find the answer (e.g., rephrasing the question).
+            Keep your answers clear, concise, and easy to understand, while being mindful of the user's intent.
+            If the user's question references something from the chat history, incorporate that information appropriately, but ensure the answer is standalone and understandable without needing to reference previous conversation turns.
+
 
             {context}
         """
@@ -122,6 +136,7 @@ def create_chain(retriever):
     qa_prompt = ChatPromptTemplate.from_messages(
         [
             ("system", qa_system_prompt),
+            # MessagesPlaceholder("context"),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}")
         ]
@@ -156,7 +171,7 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
             history_data = schemas.HistoryMessageCreate(
                 user_id=user.id,
                 session_id=session_id,
-                history_message_file=file
+                history_message_file=file[:-4]
             )
             crud.create_history_message(db, history_data)
         else:
@@ -190,7 +205,10 @@ def chat_with_collection(collection_name: str, question: str, session_id: uuid, 
     except Exception as exception:
         return {"error": "An unexpected error occurred.", "detail": str(exception)}
     
-
+@traceable(
+    run_type="chain",
+    name="Chatbot_with_document"
+)
 def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db: Session, user: UserResponse):
     try:
         # store message using txt
@@ -240,7 +258,7 @@ def chat_with_chroma_db(chroma_db_name: str, question: str, session_id: uuid, db
             history_data = schemas.HistoryMessageCreate(
                 user_id=user.id,
                 session_id=session_id,
-                history_message_file=file
+                history_message_file=file[:-4]
             )
             crud.create_history_message(db, history_data) 
             

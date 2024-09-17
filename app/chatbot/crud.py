@@ -1,5 +1,5 @@
 from .schemas import HistoryMessageCreate
-from app.auth.models import HistoryMessage
+from app.auth.models import HistoryMessage, User
 from sqlalchemy.orm import Session
 import uuid
 
@@ -21,3 +21,8 @@ def get_histoy_by_session_id(db: Session, session_id: uuid):
 def get_history_message_by_session_id(db: Session, session_id):
     history_db = db.query(HistoryMessage.history_message_file).filter(HistoryMessage.session_id == session_id).first()
     return history_db
+
+
+def get_userId_by_username(db: Session, username: str):
+    user_id_db = db.query(User.id).filter(User.username == username).first()
+    return user_id_db

@@ -3,7 +3,7 @@ import uuid
 
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_community.utilities import SQLDatabase
 from . import schemas
 from langchain_core.output_parsers import StrOutputParser
@@ -17,7 +17,7 @@ from app.message_history.dependencies import download_file_from_MinIO
 from app.chatbot.schemas import HistoryMessageCreate
 from fastapi import HTTPException,status
 from langchain_community.llms import Ollama
-
+from langsmith import traceable
 
 load_dotenv()
 
@@ -32,26 +32,84 @@ llm = ChatGroq(
 #     temperature=0.7,
 # )    
 
-my_prompt_template = """You are a SQL expert of {dialect}. 
-   Please write an SQL query base on this question: "{question}" and pay attention to use only the column names you can see in the tables below.
-   Be careful to not query for columns that do not exist. 
-   Also, pay attention to which column is in which table and if you use the SELECT with GROUP BY, please check it, because if it not appear in GROUP BY it will got error.
+PROMPT_SUFFIX = """Only use the following tables:
+{table_info}
 
-   Here is database information: {schema_info}
+Question: {input}"""
 
-   Only provide the SQL script without any explanation and follow this format for the output: 
-   SQL Script: <<Output here>>
-   """
+_postgres_template = """"
+    You are a PostgreSQL expert. Given an input question, first create a syntactically correct PostgreSQL query to run, then look at the results of the query and return the answer to the input question.
+    
+    Do not include sensitive columns such as "password", "api_key", or other confidential fields in your query. 
+    When asked to generate a query, never use "SELECT *". Instead, select only the columns necessary to answer the question. \
+    You must explicitly specify each column you are selecting. If the user does not mention specific columns, select only the most relevant columns.
+    
+    Unless the user specifies in the question a specific number of examples to obtain, query for at most {top_k} results using the LIMIT clause as per PostgreSQL. You can order the results to return the most informative data in the database.\
+                
+    Never query for all columns from a table. You must query only the columns that are needed to answer the question. \
+                
+    Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table. 
+    Pay attention to use CURRENT_DATE function to get the current date, if the question involves "today".
+
+    Use the following format:
+
+    Question: Question here
+    SQLQuery: SQL Query to run
+    SQLResult: Result of the SQLQuery
+    Answer: Final answer here
+"""
+
+_mysql_template = """"
+    You are a MySQL expert. Given an input question, first create a syntactically correct MySQL query to run, then look at the results of the query and return the answer to the input question.
+    
+    Do not include sensitive columns such as "password", "api_key", or other confidential fields in your query. 
+    When asked to generate a query, never use "SELECT *". Instead, select only the columns necessary to answer the question. \
+    You must explicitly specify each column you are selecting. If the user does not mention specific columns, select only the most relevant columns.
+    
+    Unless the user specifies in the question a specific number of examples to obtain, query for at most {top_k} results using the LIMIT clause as per MySQL. You can order the results to return the most informative data in the database. \
+    
+    Never query for all columns from a table. You must query only the columns that are needed to answer the question. You must query only the columns that are needed to answer the question. \
+    
+    Pay attention to use only the column names you can see in the tables below. Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table. Pay attention to not query password columns which in the table.
+    Pay attention to use CURDATE() function to get the current date, if the question involves "today".
+
+    Use the following format:
+
+    Question: Question here
+    SQLQuery: SQL Query to run
+    SQLResult: Result of the SQLQuery
+    Answer: Final answer here
+"""
+
+POSTGRES_PROMPT = PromptTemplate(
+    input_variables=["input", "table_info", "top_k"],
+    template=_postgres_template + PROMPT_SUFFIX
+)
+        
+MYSQL_PROMPT = PromptTemplate(
+    input_variables=["input", "table_info", "top_k"],
+    template=_mysql_template + PROMPT_SUFFIX
+)
 
 def parseResponseToSQL(response):
-    # return response.strip().replace("```", "").replace("SQL Script:","")
 
     if "SQLQuery:" in response:
         sql_query = response.split("SQLQuery:")[1].strip()
         
     else:
         raise ValueError("SQL query not found in the result")
-    return sql_query.strip().replace('\"','').replace('\n', ' ').replace('`', '').replace('sql', '').replace('\t','')
+    return sql_query.strip().replace('\"','').replace('\n', ' ').replace('`', '').replace('sql', '').replace('\t','').replace('\\','')
+
+
+def parseResponseToSQLStatementCode(response):
+
+    if "SQLQuery:" in response:
+        sql_query = response.split("SQLQuery:")[1].strip()
+        
+    else:
+        raise ValueError("SQL query not found in the result")
+    parse_data = sql_query.strip().replace('\"','').replace('\n', ' ').replace('sql', '').replace('\t','').replace('\\','')
+    return "```"+parse_data+"```"
 
 def npl2sql(request: schemas.NPLRequest):
     db = SQLDatabase.from_uri(request.connection_db)
@@ -67,9 +125,6 @@ def npl2sql(request: schemas.NPLRequest):
 
 
 def npl_branching(db: Session, question: str):
-    
-   
-    # db = SQLDatabase.from_uri("postgresql+psycopg2://postgres:123@localhost:5433/btb_homework_db")
     
     db = SQLDatabase.from_uri(db)
     
@@ -99,6 +154,10 @@ def npl_branching(db: Session, question: str):
 
     return result
 
+@traceable(
+    run_type="chain",
+    name="Classfy question"
+)
 def classify_question(question):
     classification_template = ChatPromptTemplate.from_messages(
         [
@@ -129,7 +188,10 @@ from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.runnables import RunnableBranch
 from langchain_core.messages import HumanMessage, SystemMessage
 
-    
+@traceable(
+    run_type="chain",
+    name="Chat_with_SQL"
+)    
 def npl_with_history(question: str, session_id: uuid, database_type, database_connection, db1, user):
     try:
         
@@ -146,7 +208,11 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
             db = SQLDatabase.from_uri(f"mysql+pymysql://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
         
         executed_query = QuerySQLDataBaseTool(db=db)
-        write_query = create_sql_query_chain(llm=llm, db=db)
+        write_query = create_sql_query_chain(
+            llm=llm, 
+            db=db,
+            prompt = POSTGRES_PROMPT if database_type == "postgresql" else MYSQL_PROMPT,
+        )
         
         contextualize_q_system_prompt = (
             """
@@ -192,7 +258,14 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
         branches = RunnableBranch(
             (
                 lambda output: "insensitive" in output['classification'].lower(),  # Check if output contains "insensitive"
-                lambda output: (write_query | parseResponseToSQL | executed_query).invoke({"question":output['question']}) 
+                lambda output: (write_query | parseResponseToSQL | executed_query).invoke({
+                    "question":output['question']
+                }) 
+                
+                # lambda output: {
+                #     "sql_query": (write_query| parseResponseToSQL).invoke({"question":output['question']}),
+                #     "result": execute_and_format_query(db, write_query.invoke({"question": output['question']}))
+                # }
             ),
             (
                 lambda output: "sensitive" in output['classification'].lower(),  # Check if output contains "sensitive"
@@ -226,30 +299,39 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
             res = {"classification": res.strip(), "question": question}
 
         result = branches.invoke(res)
+        # sql_query = result.get("sql_query")
+        # query_result = result.get("result")
+        
+        # print("result: ", result)
+        
+        # final_result = {
+        #     "sql_query": sql_query,
+        #     "result": query_result
+        # }
         
         # write history
-        new_chat_history = []
-        new_chat_history.append(HumanMessage(content=question))
-        new_chat_history.append(SystemMessage(content=result))
+        # new_chat_history = []
+        # new_chat_history.append(HumanMessage(content=question))
+        # new_chat_history.append(SystemMessage(content=result["result"]))
             
         """
             If no history found, store message history key into database
         """
-        if result == None:
-                # Insert to database
-                history_data = HistoryMessageCreate(
-                    user_id=user.id,
-                    session_id=session_id,
-                    history_message_file=file_name
-                )
-                create_history_message(db1, history_data)
+        # if result == None:
+        #         # Insert to database
+        #         history_data = HistoryMessageCreate(
+        #             user_id=user.id,
+        #             session_id=session_id,
+        #             history_message_file=file_name[:-4]
+        #         )
+        #         create_history_message(db1, history_data)
 
 
         """
             write to local file
         """
-        from app.chatbot.dependencies import write_history_message
-        write_history_message(new_chat_history, file_dir)
+        # from app.chatbot.dependencies import write_history_message
+        # write_history_message(new_chat_history, file_dir)
 
         return result
     
@@ -261,13 +343,20 @@ def npl_with_history(question: str, session_id: uuid, database_type, database_co
     
     
 def sql_generation(question: str, database_type, database_connection):
+    
     try:
+                
+
         if database_type == "postgresql":
             db = SQLDatabase.from_uri(f"postgresql+psycopg2://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
         elif database_type == "mysql":
             db = SQLDatabase.from_uri(f"mysql+pymysql://{database_connection.username}:{database_connection.password}@{database_connection.host}:{database_connection.port}/{database_connection.database}")
             
-        write_query = create_sql_query_chain(llm=llm, db=db)
+        write_query = create_sql_query_chain(
+            llm = llm, 
+            db = db,
+            prompt = POSTGRES_PROMPT if database_type == "postgresql" else MYSQL_PROMPT,
+        )
         result = write_query.invoke({"question":question})
         
         return parseResponseToSQL(result)
@@ -277,3 +366,22 @@ def sql_generation(question: str, database_type, database_connection):
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=str(exception)
         )    
+        
+def execute_and_format_query(db, sql_query: str):
+    print("DB: ",db)
+    """
+    Executes the SQL query and formats the result to include column names.
+    """
+    # Use your database connection to execute the query
+    cursor = db.connection().execute(sql_query)
+    
+    # Get column names from the cursor
+    column_names = [desc[0] for desc in cursor.description]
+
+    # Fetch the query result
+    rows = cursor.fetchall()
+
+    # Format the result as a list of dictionaries, where keys are column names
+    result_with_columns = [dict(zip(column_names, row)) for row in rows]
+
+    return result_with_columns
